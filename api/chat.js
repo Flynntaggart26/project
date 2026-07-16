@@ -16,15 +16,13 @@ export default async function handler(req) {
     }
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error('GEMINI_API_KEY bulunamadı');
       return new Response(JSON.stringify({ error: 'Sunucu yapılandırma hatası' }), {
         status: 500, headers: { 'Content-Type': 'application/json' },
       });
     }
 
-   const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent';
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent';
 
-    // Rolleri Gemini formatına çevir; contents mutlaka 'user' ile başlamalı
     let contents = messages.map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }]
@@ -36,6 +34,7 @@ export default async function handler(req) {
     const payload = {
       systemInstruction: {
         parts: [{ text: "Sen 16 yaşında bir lise öğrencisisin ve fonksiyonlar konusunu tam bilmiyorsun. Kullanıcı senin öğretmenin. Cevabı sen verme, bilgiçlik yapma; meraklı, bazen kafası karışan bir öğrenci gibi ol. Kullanıcının anlatımındaki eksik veya yanlış olabilecek yerleri yoklayan kısa neden/nasıl soruları sor. Aynı anda tek soru sor, kısa konuş. Kullanıcı yanlış bir şey söylerse düzeltme; sadece o noktayı sınayan bir soru sor." }]
+      },
       contents,
       generationConfig: { thinkingConfig: { thinkingLevel: "minimal" } }
     };
