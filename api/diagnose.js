@@ -61,7 +61,8 @@ export default async function handler(req) {
       systemInstruction: {
         parts: [{ text: systemPrompt }]
       },
-      contents: formattedContents
+     contents: formattedContents,
+      generationConfig: { thinkingConfig: { thinkingLevel: "minimal" } }
     };
 
     // 3. Gemini API'ye istek at (İstenen model adı kullanıldı)
