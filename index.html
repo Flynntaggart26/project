@@ -168,8 +168,14 @@
             padding: 25px 30px;
             box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.1);
             display: flex;
+            flex-direction: column;
             gap: 15px;
             border-radius: 20px 20px 0 0;
+        }
+        .chat-input-row {
+            display: flex;
+            gap: 15px;
+            width: 100%;
         }
         .chat-input {
             flex: 1;
@@ -191,9 +197,31 @@
             cursor: pointer;
             transition: all 0.3s ease;
             font-size: 16px;
+            white-space: nowrap;
         }
         .send-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5); }
         .send-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* Teşhis Butonu */
+        .btn-diagnose {
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #333;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 15px;
+            box-shadow: 0 4px 12px rgba(253, 160, 133, 0.4);
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-diagnose:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(253, 160, 133, 0.6); }
+        .btn-diagnose:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
 
         /* Bilgi Ağacı Ekranı */
         #treeScreen { background: #f8f9fc; }
@@ -207,7 +235,22 @@
             border-radius: 0 0 20px 20px;
         }
         .tree-container { padding: 50px 30px; max-width: 1400px; margin: 0 auto; flex: 1; }
-        .tree-title { text-align: center; font-size: 38px; color: #667eea; margin-bottom: 50px; font-weight: 800; }
+        .tree-title { text-align: center; font-size: 38px; color: #667eea; margin-bottom: 30px; font-weight: 800; }
+        
+        /* Teşhis Sonuç Kutusu */
+        .diagnosis-box {
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+            border: 2px solid #e74c3c;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.15);
+            animation: fadeIn 0.5s ease-in;
+            display: none; /* Başlangıçta gizli */
+        }
+        .diagnosis-box h3 { color: #c0392b; margin-bottom: 10px; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+        .diagnosis-box p { color: #555; line-height: 1.6; font-size: 16px; }
+
         .tree { display: flex; flex-direction: column; align-items: center; gap: 50px; }
         .tree-level { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; position: relative; }
         .tree-node {
@@ -253,7 +296,7 @@
             .message-bubble, .typing-bubble { max-width: 85%; }
             .legend { flex-direction: column; gap: 20px; }
             .tree-title { font-size: 28px; }
-            .chat-input-container { flex-direction: column; }
+            .chat-input-row { flex-direction: column; }
             .send-btn { width: 100%; }
         }
     </style>
@@ -286,8 +329,13 @@
             </div>
         </div>
         <div class="chat-input-container">
-            <input type="text" class="chat-input" id="chatInput" placeholder="Mesajınızı yazın..." onkeypress="handleKeyPress(event)">
-            <button class="send-btn" id="sendBtn" onclick="sendMessage()">Gönder</button>
+            <button class="btn-diagnose" id="diagnoseBtn" onclick="diagnoseLesson()">
+                <span id="diagnoseBtnText">🔍 Dersi Bitir ve Teşhis Et</span>
+            </button>
+            <div class="chat-input-row">
+                <input type="text" class="chat-input" id="chatInput" placeholder="Mesajınızı yazın..." onkeypress="handleKeyPress(event)">
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">Gönder</button>
+            </div>
         </div>
     </div>
 
@@ -298,6 +346,13 @@
         </div>
         <div class="tree-container">
             <h2 class="tree-title">Fonksiyonlar Konu Ağacı</h2>
+            
+            <!-- Teşhis Sonuç Kutusu -->
+            <div id="diagnosisResult" class="diagnosis-box">
+                <h3>📊 Teşhis Sonucu</h3>
+                <p id="diagnosisText"></p>
+            </div>
+
             <div class="tree">
                 <div class="tree-level">
                     <div class="tree-node neutral" onclick="toggleNodeState(this)">
@@ -469,6 +524,71 @@
                 node.classList.remove('strong');
                 node.classList.add('neutral');
             }
+        }
+
+        // --- YENİ: Teşhis Fonksiyonu ---
+        function diagnoseLesson() {
+            if (conversationHistory.length <= 1) {
+                alert("Teşhis için önce öğrenciyle biraz konuşmalısın!");
+                return;
+            }
+
+            const btn = document.getElementById('diagnoseBtn');
+            const btnText = document.getElementById('diagnoseBtnText');
+            
+            // Yükleniyor durumu
+            btn.disabled = true;
+            btnText.textContent = '⏳ Teşhis ediliyor...';
+
+            fetch('/api/diagnose', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: conversationHistory })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Sunucu hatası: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 1. Otomatik olarak bilgi ağacı ekranına geç
+                showScreen('treeScreen');
+
+                // 2. Zayıf düğümleri kırmızı (weak) olarak işaretle
+                if (data.weakNodes && Array.isArray(data.weakNodes)) {
+                    data.weakNodes.forEach(nodeName => {
+                        const nodes = document.querySelectorAll('.tree-node');
+                        nodes.forEach(node => {
+                            // Düğüm içindeki <strong> etiketinin metniyle eşleştir
+                            if (node.querySelector('strong').textContent.trim() === nodeName) {
+                                node.classList.remove('neutral', 'strong');
+                                node.classList.add('weak');
+                            }
+                        });
+                    });
+                }
+
+                // 3. Açıklama metnini ekranda göster
+                const resultBox = document.getElementById('diagnosisResult');
+                const resultText = document.getElementById('diagnosisText');
+                
+                if (data.aciklama) {
+                    resultText.textContent = data.aciklama;
+                    resultBox.style.display = 'block';
+                } else {
+                    resultBox.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Teşhis hatası:', error);
+                alert('Teşhis sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+            })
+            .finally(() => {
+                // Butonu eski haline getir
+                btn.disabled = false;
+                btnText.textContent = '🔍 Dersi Bitir ve Teşhis Et';
+            });
         }
     </script>
 </body>
